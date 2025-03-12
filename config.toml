@@ -1,0 +1,49 @@
+# The URL the site will be built for
+base_url = "https://blog.nommy.moe"
+title = "Just Nommy"
+description = "Nommy's personal blog"
+default_language = "en"
+output_dir = "public"
+minify_html = true
+
+compile_sass = true
+build_search_index = true
+
+theme = "terminimal"
+
+#[languages.en]
+taxonomies = [
+    {name = "tags"}
+]
+
+#[languages.ru]
+#title = "Just Nommy"
+
+#build_search_index = true
+#taxonomies = [
+#    {name = "tags"}
+#]
+
+[markdown]
+# Whether to do syntax highlighting
+# Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
+highlight_code = true
+
+[extra]
+default_language = "en"
+
+accent_color = "red"
+background_color = "blue"
+logo_text = "Just Nommy"
+
+author = "Evgenia Vaartis"
+
+
+use_full_hack_font = true
+
+menu_items = [
+    { name = "About Me", url = "$BASE_URL/about"},
+    { name = "Blog", url = "$BASE_URL/blog"},
+    { name = "Blog [Ru]", url = "$BASE_URL/blog_ru" },
+    { name = "GitHub", url = "https://github.com/97nomad/" }
+]
