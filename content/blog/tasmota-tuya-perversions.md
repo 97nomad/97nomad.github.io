@@ -7,38 +7,38 @@ tags = [ 'tasmota', 'smarthome', 'en', 'hass' ]
 
 # What problem do we have?
 
-One day, a very naughty person decided that wiring the whole house (including the electric stove) on a single 2.5mm² was a very good idea.
+One day, a very naughty person decided that wiring the whole house (including the electric stove) on a single 2.5mm² cable was a very good idea.
 
-Fire safety regulations and automatic fuses didn't see it that way. 
+Fire safety regulations and automatic fuses didn't agree with this fact. 
 
-So turning on the boiler and the oven at the same time causes a complete power outage in a single apartment, which frustrates me a lot. And going to unplug the boiler every time is definitely not something I want to do.
+So turning on the boiler and the oven at the same time causes a complete power outage in a single apartment, which frustrates me a lot. And going to unplug the boiler every time when I want to cook something is definitely not the thing that I want to do.
 
 And because of this we are going to make a smart home so that I can control the boiler at least from my smartphone.
 
-# La Planchas
+# Las Planchas
 
-A quick search on Amazon gave me `SONOFF Zigbee Bridge 3.0 Gateway Hub, ,Soporte de Protocolo Dual,WiFi, Compatible con Dispositivos Zigbee Pro, Alexa & Google`, aka `SONOFF ZBBridge-P` only for 35€. \
+A quick search on Amazon gave me `SONOFF Zigbee Bridge 3.0 Gateway Hub, ,Soporte de Protocolo Dual,WiFi, Compatible con Dispositivos Zigbee Pro, Alexa & Google`, also known as `SONOFF ZBBridge-P` only for 35€. \
 A quick googling revealed that there's some kind of opensource firmware for it. “I should buy it”, I thought.
 
 At the same time to the cart went `ZigBee Enchufe Inteligente Alexa 16A, 3680W Smart Plug con Monitor de Energía, Enchufe Temporizador con Control Remoto, Control por Voz y Funciones de Temporización, apoyo Alexa & Google Home` (4 pieces for 45€), which later turned out to be `Tuya TS011F`.
 
 And also for the change was thrown in `Garza Smart - Bombilla LED Zigbee Estándar A60, 11W (equivale a 75W de incandescencia), E27, Requiere Puente/Bridge, RGB + CCT, Intensidad regulable, Programable, Control por voz y app, Alexa/Google`, which for some reason pretended to be `Tuya TZ3210`. \
-What exactly this `TZ3210` is, I have not been able to establish, because various sources say that it is either a switch, a humidity and temperature sensor, or as I can guess an RGB lightbulb.
+What exactly this `TZ3210` means, I have not been able to establish. Various sources say that it is either a switch, a humidity and temperature sensor, or as I can guess an RGB lightbulb.
 
 # Curing the bridge from the cloud
 
-Since it's *mauvais* to dump smarthome data to some obscure cloud, the first thing to do is to put a new firmware in the bridge.
+Since it's *mauvais* to dump all smart home data to some obscure cloud, the first thing to do is to put a new firmware to the bridge.
 
 I followed this very detailed instruction [How to flash Tasmota on Sonoff ZB Bridge Pro](https://notenoughtech.com/home-automation/tasmota-on-sonoff-zb-bridge-pro/).
 
 The only thing that caused some confusion is the `GPIO00` pin. It should be pulled up to `GND` during the startup to put this *la plancha* into UART mode. \
-I had some difficult time with this, so you can track the success of the operation with elegant `screen /dev/ttyACM0 115200` and then looking at the startup logs.
+I had some difficult time trying to understand what went wrong, so you can track the successfulness of this operation with elegant `screen /dev/ttyACM0 115200` and then look at the startup logs.
 
 I won't describe the complete flashing process, as it's perfectly described in the link above, but...
 
-{{ figure(src="/blog/tasmota-tuya-perversions/how-to-get-heart-attack.jpg", caption="Fig. 1. How to suddenly get heart attack") }}
+{{ figure(src="/blog/tasmota-tuya-perversions/how-to-get-heart-attack.jpg", caption="Fig. 1. How to suddenly get a heart attack") }}
 
-Fortunately, this bug was fixed a long time ago and someone just didn't update Flipper's firmware for a long time.
+Fortunately, this bug was fixed a long time ago and someone just didn't update their Flipper's firmware for a long time.
 
 # Setting up secured MQTT
 
@@ -93,7 +93,7 @@ I'm also using a system with two listeners. One is SSL protected, restricted to 
 
 Also worth noting are the lines `“require_certificate” = false;` and `“tls_version” = “tlsv1.2`. \
 First line disables TLS authorization, leaving the password one, and the second enables traffic encryption. \
-Without the first one Tasmota cannot connect to MQTT, and without the second one Mosquitto will ignore all configured certificates and work in unprotected mode.
+Without the first one Tasmota cannot connect to MQTT, and without the second one Mosquitto will ignore all configured certificates and will work in unencrypted mode.
 
 On the Home Assistant side I have configured a bridge that will take all messages from the external MQTT and put them into the main MQTT. \
 Just because I already had MQTT configured for local stuff and didn't want to touch it.
@@ -159,11 +159,11 @@ And since we have a bridge, two facts follow from this:
 
 But first we should arm ourselves with the console on the bridge itself and see what we have there.
 
-{{ figure(src=“/blog/tasmota-tuya-perversions/tasmota-console.png”, caption="Fig. 3. Green and scary") }}}
+{{ figure(src = "/blog/tasmota-tuya-perversions/tasmota-console.png", caption="Fig. 3. Green and scary") }}
 
 We go to `Tools > Console` in the bridge web interface and start poking everything around with a stick.
 
-The full list of commands can be found here: [Tasmota Commands](https://tasmota.github.io/docs/Commands/), but we are only interested in the [Zigbee](https://tasmota.github.io/docs/Commands/#zigbee) part.
+The full list of commands can be found here: [Tasmota Commands](https://tasmota.github.io/docs/Commands/), but now we are only interested in the [Zigbee](https://tasmota.github.io/docs/Commands/#zigbee) part.
 
 To be more precise, the commands `ZbInfo`, `ZbName` and `ZbSend`.
 
@@ -192,19 +192,19 @@ The last ones will be especially useful for us, but we will talk about it later.
 
 Now it's about time to give all devices readable names so that we don't get confused later.
 
-`ZbName short_address,name` will help us with this. Then this name will still pop up in every event and we can do something using it, but the main goal is just not to get confused.
+`ZbName short_address,name` will help us with this. The name, that we will give tp the device will pop up in every event and we can do something using it, but the main goal is just not to get confused with different addresses.
 
 ### ZbSend
 
-And now we can actively poke the device with the stick, because `ZbSend` allows us to send some message and see how the device reacts.
+And now we can actively poke the device with the stick, because `ZbSend` allows us to send different messages and see how the device reacts.
 
 We can, for example, put a stick in the smart socket.
 
 `ZbSend { “device”: “0x9AD4”, “send”: { “power”: “ON“ }}` will turn the smart socket on, and `ZbSend {”device": ‘0x9AD4’, ‘send’: { “Power”: “OFF” }}` will turn it off, correspondingly.
 
-How we know, that we need to send message `{ “Power”: “ON” }` is the most interesting question.
+How we know, that we need to send message `{ “Power”: “ON” }`? It's the most interesting question.
 
-And the answer to it would be *"just guess"*, but that's not actually true.
+And the answer to it would be *"just guessed"*, but that's not actually true.
 
 Let's take a closer look at the JSON from the output of the `ZbInfo 0x9AD4` command
 
@@ -236,7 +236,7 @@ Let's take a closer look at the JSON from the output of the `ZbInfo 0x9AD4` comm
 }
 ```
 
-Among other things, here you can see the `Power` field with the value `0`, i.e. “Off”. \
+Among other things, here we can see the `Power` field with the value `0`, i.e. “Off”. \
 And the trick with more readable `ON` and `OFF` I just found up in the Internets.
 
 And if you look at the JSON from the lightbulb, there's more interesting stuff here.
@@ -291,7 +291,7 @@ We can't do `ZbSend { “device”: “0x7E20”, “send”: { “hue”: “12
 
 As a quick workaround for the problem, you can use [Backlog](https://tasmota.github.io/docs/Commands/#the-power-of-backlog), the built-in language...
 
-In short, you can just pass several commands in a row to this thing, and then they will be executed sequentially. \
+In short, you can just pass several commands in a row to this device, and then they will be executed sequentially. \
 And as a result, our command will look something like this:
 ```
 Backlog ZbSend { “device”: “0x7E20”, “send”: { “Hue”: “128” }}; ZbSend { “device”: “0x7E20”, “send”: { “sat”: “254” }}
@@ -312,12 +312,12 @@ And may Nix and its ability to write functions for autogenerating YAML help us.
 
 ## MQTT Topics
 
-Essentially we only need two topics: `tasmota/tele/tasmota_${gw_addr}/SENSOR` to read data and `tasmota/cmnd/tasmota_${gw_addr}/ZbSend` to send commands. \
+Essentially we only need two topics: `tasmota/tele/tasmota_${gw_addr}/SENSOR` to read telemetry and `tasmota/cmnd/tasmota_${gw_addr}/ZbSend` to send commands. \
 Perhaps a third `tasmota/cmnd/tasmota_${gw_addr}/Backlog` for executing Backlog commands.
 
-Yes, any of the commands from the list can be called via MQTT by sending it to the appropriate topic, where the last part is the name of the command.
+Yes, any of the commands from the [list](https://tasmota.github.io/docs/Commands) can be called via MQTT by sending it to the appropriate topic, where the last part is the name of the command.
 
-We will send JSON's and parse them too. Let's get to practice.
+We will send JSON's and parse them too. So let's get to practice.
 
 ### Switches and sensors
 
@@ -522,15 +522,15 @@ And we are dealing with a lightbulb that is both a switch and a humidity sensor.
 
 So the only adequate way to know the real range of values is to poke them with a stick and see what happens.
 
-For example, `Dimmer` has a value range of 0...254. But when trying to set it to 255, the bulb returns null, which is very strange, because it is obviously an 8-bit variable...
+For example, `Dimmer` has a value range of 0...254. But when we try to set it to 255, the bulb returns null from the telemetry topic, which is very strange, because it is obviously an 8-bit variable.
 
-My attempts to find the values of `Hue` and `Sat` did not lead to anything constructive, but `X` and `Y` simply refuse to accept the command when trying to put into them a value not in the range of 0..65279. \
+My attempts to find the values of `Hue` and `Sat` did not lead to anything constructive, but `X` and `Y` simply refused to accept the command when I tried to put into them a value not in the range of 0..65279. \
 Why not 0..65535, as someone suggested on the Internets, thinking that this is a 16-bit variable? \
-Well, that's... Because!
+Well, that's... Because! Just don't ask.
 
 ### Compiling everything into Home Assistant
 
-As a result, we have gathered all the knowledge gained during the poking thing with a stick, and we are ready to write the function.
+As a result, we have gathered all the knowledge, gained during the process of poking things with a stick, and now we are ready to write the function.
 
 ```nix
 tz3210_lamp = id: name: short_addr: gw_addr:
@@ -564,12 +564,12 @@ tz3210_lamp = id: name: short_addr: gw_addr:
 This function is just a beautiful collection of hacks to make the things somehow work. \
 Let's go in order
 
-According to Home Assistant, `Dimmer` should take values 0...255, but as we already know, the maximum value there is 254, so just subtract one. Anyway you can't lower power in HA interface lower than 3%.
+According to Home Assistant, `Dimmer` should take values 0...255, but as we already know, the maximum value there is 254, so just subtract one. Anyway you can't set a power in HA interface lower than 3%.
 Same thing for `CT`.
 
-According to the same Home Assistant, `X` and `Y` take values from 0 to 1.0, so the conversion back and forth is done simply by multiplication by the maximum possible value.
+According to the same default Home Assistant settings, `X` and `Y` take values from 0 to 1.0, so the conversion back and forth is done simply by multiplication\division by the maximum possible value.
 
-Besides, `Color` function is used here in `xy_command_template`, which allows to pass `X` and `Y` values in one command, which was accidentally found in the discussion about some device I don't remember where.
+Besides, `Color` function is used here in `xy_command_template`, which allows to pass `X` and `Y` values in one command, which was accidentally found in the discussion about some other device I don't remember where.
 
 If this function wasn't there, the config would look something like this:
 
