@@ -3,3 +3,9 @@
 .container {
     max-width: 95% !important;
 }
+
+details summary {
+    text-decoration: underline;
+    text-decoration-style: dashed;
+    text-underline-offset: 3px;
+}
