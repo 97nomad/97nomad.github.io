@@ -1,8 +1,20 @@
 {% extends "index.html" %}
 
+{% block extra_head %}
+{% if section and section.generate_feeds %}
+    <link rel="alternate" type="application/atom+xml" title="{{ section.title }} - Atom Feed" href="{{ section.permalink | safe }}atom.xml">
+    <link rel="alternate" type="application/rss+xml" title="{{ section.title }} - RSS Feed" href="{{ section.permalink | safe }}rss.xml">
+{% endif %}
+{% endblock extra_head %}
+
 {% block content %}
     <div class="post">
-        <h1 class="post-title">{{ section.title }}</h1>
+        <h1 class="post-title">
+          {{ section.title }}&nbsp;
+          {% if section and section.generate_feeds %}
+          <a href="{{ section.permalink | safe }}atom.xml">[RSS]</a>
+          {% endif %}
+        </h1>
 
         {{ post_macros::list_posts(pages=section.pages) }}
     </div>

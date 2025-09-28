@@ -11,6 +11,8 @@ build_search_index = true
 
 theme = "terminimal"
 
+feed_filenames = ["rss.xml", "atom.xml"]
+
 #[languages.en]
 taxonomies = [
     {name = "tags"}
@@ -42,8 +44,8 @@ author = "Evgenia Vaartis"
 use_full_hack_font = true
 
 menu_items = [
-    { name = "About Me", url = "$BASE_URL/about"},
-    { name = "Blog", url = "$BASE_URL/blog"},
+    { name = "About Me", url = "$BASE_URL/about" },
+    { name = "Blog", url = "$BASE_URL/blog" },
     { name = "Blog [Ru]", url = "$BASE_URL/blog_ru" },
     { name = "GitHub", url = "https://github.com/97nomad/" }
 ]
