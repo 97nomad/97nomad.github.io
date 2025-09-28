@@ -2,8 +2,7 @@
 
 {% block extra_head %}
 {% if section and section.generate_feeds %}
-    <link rel="alternate" type="application/atom+xml" title="{{ section.title }} - Atom Feed" href="{{ section.permalink | safe }}atom.xml">
-    <link rel="alternate" type="application/rss+xml" title="{{ section.title }} - RSS Feed" href="{{ section.permalink | safe }}rss.xml">
+    <link rel="alternate" type="application/atom+xml" title="Just Nommy — {{ section.title }}" href="{{ section.permalink | safe }}atom.xml">
 {% endif %}
 {% endblock extra_head %}
 
