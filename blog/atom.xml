@@ -1,0 +1,969 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
+    <title>Just Nommy - Blog</title>
+    <subtitle>Nommy&#x27;s personal blog</subtitle>
+    <link rel="self" type="application/atom+xml" href="https://blog.nommy.moe/blog/atom.xml"/>
+    <link rel="alternate" type="text/html" href="https://blog.nommy.moe/blog/"/>
+    <generator uri="https://www.getzola.org/">Zola</generator>
+    <updated>2026-03-17T00:00:00+00:00</updated>
+    <id>https://blog.nommy.moe/blog/atom.xml</id>
+    <entry xml:lang="en">
+        <title>Deep cleaning of secrets in Gitlab</title>
+        <published>2026-03-17T00:00:00+00:00</published>
+        <updated>2026-03-17T00:00:00+00:00</updated>
+        
+        <author>
+          <name>
+            
+              Unknown
+            
+          </name>
+        </author>
+        
+        <link rel="alternate" type="text/html" href="https://blog.nommy.moe/blog/secret-deep-cleaning-gitlab/"/>
+        <id>https://blog.nommy.moe/blog/secret-deep-cleaning-gitlab/</id>
+        
+        <content type="html" xml:base="https://blog.nommy.moe/blog/secret-deep-cleaning-gitlab/">&lt;p&gt;So, we accidentally &lt;code&gt;git commit -a -m &quot;I don&#x27;t know how to use git&quot;&lt;&#x2F;code&gt;. &lt;br &#x2F;&gt;
+Or we just missed the fact that after a frantic debugging session, the new commit contain credentials for some particularly important service that shouldn&#x27;t be there.&lt;br &#x2F;&gt;
+We&#x27;re all humans, after all.&lt;br &#x2F;&gt;
+So now we&#x27;re going to figure out how to minimize the damage.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;scenario-one-nothing-seems-wrong-yet&quot;&gt;Scenario One: Nothing seems wrong yet&lt;&#x2F;h1&gt;
+&lt;p&gt;We noticed in time that something went wrong and haven&#x27;t done &lt;code&gt;git push&lt;&#x2F;code&gt; yet.&lt;br &#x2F;&gt;
+Give yourself a gold star for paying attention, edit the file, do &lt;code&gt;git commit --amend&lt;&#x2F;code&gt;, and enjoy peaceful life.&lt;br &#x2F;&gt;
+But that&#x27;s only if the slip-up happened in the very last commit.&lt;&#x2F;p&gt;
+&lt;p&gt;If mistake happened several commits ago and we still haven&#x27;t done &lt;code&gt;git push&lt;&#x2F;code&gt;, there are two more or less good options.&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;git reset --soft &amp;lt;commit_sha&amp;gt;&lt;&#x2F;code&gt;, edit the file, and create a clean commit again.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;git rebase -i &amp;lt;commit_sha&amp;gt;&lt;&#x2F;code&gt; and enjoy the thrilling process of an interactive rebase.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;Also there is an alternative route using fixups, but you would need to have them in your workflow pipeline from the beginning.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;scenario-two-why-am-i-an-idiot&quot;&gt;Scenario Two: Why am I an idiot?&lt;&#x2F;h1&gt;
+&lt;p&gt;We didn&#x27;t notice in time that something went wrong and did &lt;code&gt;git push&lt;&#x2F;code&gt; anyway.&lt;&#x2F;p&gt;
+&lt;p&gt;First of all — &lt;strong&gt;any credentials that made it into the public must be revoked as quickly as possible&lt;&#x2F;strong&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;Secondly — get ready to get beaten. Maybe even with legs.&lt;br &#x2F;&gt;
+To make the beating less intense, do everything from the first case, and then &lt;code&gt;git push --force-with-lease&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;hr &#x2F;&gt;
+&lt;p&gt;Usually, this is where most of the &quot;What to do if I pushed creds to git?&quot; guides end, and where the actual content that I want to share begins.&lt;br &#x2F;&gt;
+Highly knowledgeable people know that Git has a reflog, and a rewritten commit still stays on the disk, available for recovery. &lt;br &#x2F;&gt;
+And people who make Gitlab know this too, which is why Gitlab periodically runs housekeeping tasks that clean these dangling commits.&lt;&#x2F;p&gt;
+&lt;p&gt;To avoid waiting for the janitor to sweep up after you, you can clear the trash in &lt;code&gt;Settings &amp;gt; General &amp;gt; Advanced &amp;gt; Prune unreachable objects&lt;&#x2F;code&gt;.&lt;br &#x2F;&gt;
+However, there are cases where this button, despite its dangerous red color, doesn&#x27;t wipe the dangling commit.&lt;br &#x2F;&gt;
+You can check this by trying to open the commit with a direct link. Something like &lt;code&gt;gitlab.example.com&#x2F;group&#x2F;project&#x2F;-&#x2F;commit&#x2F;46a9d30f7a7d86adf34299367b0be7ffd0700eb60b079f3cad246c57409bd471&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;Does it show 404? Everything is fine (relatively). But sometimes it shows the old code, and here they are, our creds in plain text again.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;scenario-three-oh-god-why&quot;&gt;Scenario Three: Oh God, why?&lt;&#x2F;h1&gt;
+&lt;p&gt;Here we should take a detour and talk about things that aren&#x27;t in Git, but are in Gitlab. CI&#x2F;CD and Merge Requests.&lt;br &#x2F;&gt;
+Somehow we can see the list of commits, diffs, and all of that in the MR.&lt;br &#x2F;&gt;
+And it doesn&#x27;t go anywhere. Even when the branch is deleted, the MR is closed, and everyone has already forgotten about it.&lt;&#x2F;p&gt;
+&lt;p&gt;It&#x27;s especially &quot;pleasant&quot; to find out when a repository has existed for several years and someone once left an API key in a separate branch, in one of the very first MRs.&lt;br &#x2F;&gt;
+Bonus points if repository was inherited and the account access was lost five years ago, and SOC 2 audit is right around the corner.&lt;&#x2F;p&gt;
+&lt;p&gt;And this is exactly the scenario we&#x27;re going to talk about now. Specifically in the context of self-hosted Gitlab, because no one is giving us root on the cloud.&lt;&#x2F;p&gt;
+&lt;p&gt;Also, a small disclaimer: this applies to Gitlab 18.6.2, and I&#x27;m not the only one annoyed by the keep-around mechanism, so everything might change in the future.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;cleaning-up-the-main-history&quot;&gt;Cleaning up the main history&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;strong&gt;MAKE A BACKUP!!!&lt;&#x2F;strong&gt;&lt;br &#x2F;&gt;
+Just like this in caps with three exclamation marks. Losing important data while rewriting history is a very real possibility, and you&#x27;d better have a recovery point.&lt;&#x2F;p&gt;
+&lt;p&gt;Next, we need to run a scanner of our choice and record the full hashes of the commits that contained the creds.&lt;br &#x2F;&gt;
+Just because it&#x27;s convenient, and running a scanner each time we did something is not a particularly fast process.&lt;&#x2F;p&gt;
+&lt;p&gt;And after that, you can run &lt;a href=&quot;https:&#x2F;&#x2F;rtyley.github.io&#x2F;bfg-repo-cleaner&#x2F;&quot;&gt;BFG&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;newren&#x2F;git-filter-repo&quot;&gt;git-filter-repo&lt;&#x2F;a&gt;, or some other tool to purge unwanted strings from the history. It doesn&#x27;t really matter which one.&lt;&#x2F;p&gt;
+&lt;p&gt;Then &lt;code&gt;git push --force --all&lt;&#x2F;code&gt;, and all of this from the tool&#x27;s manual.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;finding-entities&quot;&gt;Finding entities&lt;&#x2F;h2&gt;
+&lt;p&gt;Before starting to clean the remote repository, we should track down where these commits are used at all, to not accidentally break the Gitlab UI.&lt;&#x2F;p&gt;
+&lt;p&gt;So we do &lt;code&gt;gitlab-rails console&lt;&#x2F;code&gt; and start remembering Ruby.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;ruby&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-ruby &quot;&gt;&lt;code class=&quot;language-ruby&quot; data-lang=&quot;ruby&quot;&gt;&lt;span&gt;commit_sha = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;lt;target_commit_hash&amp;gt;&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# List of pipeline IDs
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#ebcb8b;&quot;&gt;Ci&lt;&#x2F;span&gt;&lt;span&gt;::&lt;&#x2F;span&gt;&lt;span style=&quot;color:#ebcb8b;&quot;&gt;Pipeline&lt;&#x2F;span&gt;&lt;span&gt;.where(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;sha:&lt;&#x2F;span&gt;&lt;span&gt; commit_sha).map(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;:id&lt;&#x2F;span&gt;&lt;span&gt;)
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# List of MRs
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#ebcb8b;&quot;&gt;MergeRequestDiffCommit&lt;&#x2F;span&gt;&lt;span&gt;.where(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;sha:&lt;&#x2F;span&gt;&lt;span&gt; commit_sha).map(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;:merge_request_diff&lt;&#x2F;span&gt;&lt;span&gt;).map(&amp;amp;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;:id&lt;&#x2F;span&gt;&lt;span&gt;).uniq
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Not very pretty but easy to debug.&lt;&#x2F;p&gt;
+&lt;p&gt;I&#x27;m not sure if these things must be deleted, but just to be safe. Who knows where Gitlab can break later.&lt;br &#x2F;&gt;
+You can do this through the console, but at this stage, paranoia usually reaches the level &quot;it&#x27;s better to do this in UI&quot;.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;finding-the-repository&quot;&gt;Finding the repository&lt;&#x2F;h2&gt;
+&lt;p&gt;Before opening the console, you need to go to the UI and find the Project ID. It&#x27;s in &lt;code&gt;Settings &amp;gt; General &amp;gt; Naming, descriptions, topics &amp;gt; Project ID&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;Then return to the console and do:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;ruby&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-ruby &quot;&gt;&lt;code class=&quot;language-ruby&quot; data-lang=&quot;ruby&quot;&gt;&lt;span style=&quot;color:#ebcb8b;&quot;&gt;Project&lt;&#x2F;span&gt;&lt;span&gt;.find(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;PROJECT_ID&lt;&#x2F;span&gt;&lt;span&gt;).repository.disk_path
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This will give us a relative path like &lt;code&gt;@hashed&#x2F;5d&#x2F;0d&#x2F;5d0db47fcc1b04bcf18b2f6d7d2f8d9c40589f3bf329b55baf7084cb553e8da8.git&lt;&#x2F;code&gt;.&lt;br &#x2F;&gt;
+It&#x27;s relative to the storage path, so if you&#x27;re on NixOS, it&#x27;s &lt;code&gt;&#x2F;var&#x2F;gitlab&#x2F;state&#x2F;repositories&#x2F;&lt;&#x2F;code&gt; by default. For other setups — check the blueprint.&lt;&#x2F;p&gt;
+&lt;p&gt;Glue it together and let&#x27;s go:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;bash&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-bash &quot;&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#96b5b4;&quot;&gt;cd&lt;&#x2F;span&gt;&lt;span&gt; &#x2F;var&#x2F;gitlab&#x2F;state&#x2F;repositories&#x2F;@hashed&#x2F;5d&#x2F;0d&#x2F;5d0db47fcc1b04bcf18b2f6d7d2f8d9c40589f3bf329b55baf7084cb553e8da8.git
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# Branches with the commit
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git&lt;&#x2F;span&gt;&lt;span&gt; branch&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --contains &lt;&#x2F;span&gt;&lt;span&gt;&amp;lt;commit_sha&amp;gt;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# Tags with the commit
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git&lt;&#x2F;span&gt;&lt;span&gt; tag&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --contains &lt;&#x2F;span&gt;&lt;span&gt;&amp;lt;commit_sha&amp;gt;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#65737e;&quot;&gt;# Refs with the commit
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git&lt;&#x2F;span&gt;&lt;span&gt; for-each-ref&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --contains &lt;&#x2F;span&gt;&lt;span&gt;&amp;lt;commit_sha&amp;gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The search in branches and tags must return an empty result. If it&#x27;s not empty, you missed something and it&#x27;s time to go back to step one.&lt;&#x2F;p&gt;
+&lt;p&gt;But the list of refs from the last command are the very things that prevent Gitlab from properly cleaning up commits. It looks something like this:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;d6cb0ea8746201dfb0a9303563bd52e31555541a25fc9e1dbfda8f757a9c92bb    commit  refs&#x2F;keep-around&#x2F;d6cb0ea8746201dfb0a9303563bd52e31555541a25fc9e1dbfda8f757a9c92bb
+&lt;&#x2F;span&gt;&lt;span&gt;4ef7ba090eb92e6a95f727b73cf2f1979ba83ee6bb63a4dc902790793b9274c6    commit  refs&#x2F;keep-around&#x2F;4ef7ba090eb92e6a95f727b73cf2f1979ba83ee6bb63a4dc902790793b9274c6
+&lt;&#x2F;span&gt;&lt;span&gt;fd3fa98ec1d67c155f2e9900023460bd4c41f6b87b2344188a4a1b1b51ee6fbf    commit  refs&#x2F;keep-arount&#x2F;fd3fa98ec1d67c155f2e9900023460bd4c41f6b87b2344188a4a1b1b51ee6fbf
+&lt;&#x2F;span&gt;&lt;span&gt;d602c43e76a1e51e77b9aa441f5250d14b05ce55b213214aa287610b22b8df5a    commit  refs&#x2F;merge-requests&#x2F;512&#x2F;merge
+&lt;&#x2F;span&gt;&lt;span&gt;ae2e6f410385c1e78c2be5bb839299b14db296a9048ddb04a5605e035e023816    commit  refs&#x2F;merge-requests&#x2F;712&#x2F;merge
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;It&#x27;s logical to assume that &lt;code&gt;refs&#x2F;merge-requests&lt;&#x2F;code&gt; relate to merge requests, but &lt;code&gt;refs&#x2F;keep-around&lt;&#x2F;code&gt; is a slightly different story. As far as I understand (and I didn&#x27;t understand very well), Gitlab creates these refs for CI tasks, but apparently not only for that. Therefore, cleaning them up might break something besides the CI, which we (in theory) cleaned up in the previous step.&lt;&#x2F;p&gt;
+&lt;p&gt;So, at your own risk:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;bash&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-bash &quot;&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git&lt;&#x2F;span&gt;&lt;span&gt; update-ref&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; -d &lt;&#x2F;span&gt;&lt;span&gt;&amp;lt;ref_name&amp;gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;And finally:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;bash&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-bash &quot;&gt;&lt;code class=&quot;language-bash&quot; data-lang=&quot;bash&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git&lt;&#x2F;span&gt;&lt;span&gt; reflog expire&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --expire&lt;&#x2F;span&gt;&lt;span&gt;=now&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --all
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;git&lt;&#x2F;span&gt;&lt;span&gt; gc&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt; --aggressive --prune&lt;&#x2F;span&gt;&lt;span&gt;=now
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h1 id=&quot;scenario-four-hans-get-the-flammenwerfer&quot;&gt;Scenario Four: Hans, get the flammenwerfer!&lt;&#x2F;h1&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;git@sweetiebelle in &#x2F;var&#x2F;gitlab&#x2F;state&#x2F;repositories&#x2F;52&#x2F;66&#x2F;5266a2866c3d458909112a2a85958e690e5b5b10ac3ef8e97b50f195ff145d74.git λ git for-each-ref --contains b682940 | wc -l
+&lt;&#x2F;span&gt;&lt;span&gt;6251
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;&lt;strong&gt;FUCK!!!&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;I&#x27;ll just create a new one.&lt;&#x2F;p&gt;
+</content>
+        
+    </entry>
+    <entry xml:lang="en">
+        <title>Testing &quot;exotic&quot; p2p VPN</title>
+        <published>2025-09-27T00:00:00+00:00</published>
+        <updated>2025-09-27T00:00:00+00:00</updated>
+        
+        <author>
+          <name>
+            
+              Unknown
+            
+          </name>
+        </author>
+        
+        <link rel="alternate" type="text/html" href="https://blog.nommy.moe/blog/exotic-mesh-vpn/"/>
+        <id>https://blog.nommy.moe/blog/exotic-mesh-vpn/</id>
+        
+        <content type="html" xml:base="https://blog.nommy.moe/blog/exotic-mesh-vpn/">&lt;h1 id=&quot;how-did-the-moose-begin&quot;&gt;How did the moose begin&lt;&#x2F;h1&gt;
+&lt;p&gt;My standard &quot;everyday&quot; solution when it comes to connecting computers into a single network is Wireguard. &lt;br &#x2F;&gt;
+Wireguard is good, supports p2p, and generally has no downsides.&lt;&#x2F;p&gt;
+&lt;p&gt;The downsides come from having part of my home infrastructure located in territory controlled by a country that has blocked Wireguard by signatures. &lt;br &#x2F;&gt;
+This is, of course, utterly disgusting, and what&#x27;s even more disgusting is that these blocks have long since stopped following any kind of legislation. &lt;br &#x2F;&gt;
+The result is an incomprehensible black box that can do anything, behave however it wants, and nobody knows how this shaitan-machine even works anymore.&lt;&#x2F;p&gt;
+&lt;p&gt;So it&#x27;s time for penetration.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;why-not-obfuscation&quot;&gt;Why not obfuscation?&lt;&#x2F;h1&gt;
+&lt;p&gt;Actually, there are several projects that allow obfuscating Wireguard traffic and punching through firewalls. &lt;br &#x2F;&gt;
+&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;wangyu-&#x2F;udp2raw&quot;&gt;udp2raw&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;erebe&#x2F;wstunnel&quot;&gt;wstunnel&lt;&#x2F;a&gt; and others handle this excellently. &lt;br &#x2F;&gt;
+And &lt;a href=&quot;https:&#x2F;&#x2F;amnezia.org&#x2F;&quot;&gt;Amnezia VPN&lt;&#x2F;a&gt; has made their own fork of Wireguard, specifically for breaking through government censorship.&lt;&#x2F;p&gt;
+&lt;p&gt;But the main problem with obfuscation is the reduction of effective packet MTU. Because we wrap one packet in another packet, and this overhead takes up space. &lt;br &#x2F;&gt;
+And that&#x27;s not good.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;what-i-want-from-a-vpn&quot;&gt;What I want from a VPN&lt;&#x2F;h1&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;p2p mesh network&lt;&#x2F;strong&gt; &lt;br &#x2F;&gt;
+Wireguard is good, of course, but routing all traffic through one server has consequences. &lt;br &#x2F;&gt;
+The consequences usually include launching a Mars rover to switch the VPN to another server in case of IP blocking or just because the server started feeling unwell. &lt;br &#x2F;&gt;
+And routing traffic halfway around the planet just to get access to a machine that&#x27;s within arm&#x27;s reach — that&#x27;s just wrong.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Open source and selfhosted&lt;&#x2F;strong&gt;&lt;br &#x2F;&gt;
+In matters like this, relying on a third-party provider is either dangerous or useless. &lt;br &#x2F;&gt;
+Tailscale, for example, is famous for its geographical blocks, so relying on it is pointless. &lt;br &#x2F;&gt;
+And since Tailscale doesn&#x27;t do this on a whim (I hope), there&#x27;s no guarantee that other services won&#x27;t do the same.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Ideologically correct VPN&lt;&#x2F;strong&gt; &lt;br &#x2F;&gt;
+This point exists here specifically for Headscale and ZeroTier. &lt;br &#x2F;&gt;
+Creating a crippled open-source product to advertise a commercial one is a vicious practice and I personally don&#x27;t approve this.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Not Wireguard&lt;&#x2F;strong&gt; &lt;br &#x2F;&gt;
+For obvious reasons. Signature-based blocking.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;Packaged in nixpkgs&lt;&#x2F;strong&gt;&lt;br &#x2F;&gt;
+This one&#x27;s even more obvious. I&#x27;m not going to package a VPN into nix myself.&lt;&#x2F;p&gt;
+&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;h1 id=&quot;test-subjects&quot;&gt;Test subjects&lt;&#x2F;h1&gt;
+&lt;h2 id=&quot;easytier&quot;&gt;EasyTier&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;EasyTier&#x2F;EasyTier&quot;&gt;GitHub&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;easytier.cn&#x2F;en&#x2F;&quot;&gt;Official site&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;This is probably the simplest way to create a p2p network. So simple that there isn&#x27;t even a module in nixpkgs to run it.&lt;&#x2F;p&gt;
+&lt;p&gt;For security, there&#x27;s only a password in &lt;code&gt;--network-secret&lt;&#x2F;code&gt;, which is used for traffic encryption.&lt;&#x2F;p&gt;
+&lt;p&gt;To work, it immediately opens TCP, UDP, WG, WS, WSS and whatever Lucifer&#x27;s IT department cooked up. If one gets blocked, it&#x27;ll break through via another.&lt;&#x2F;p&gt;
+&lt;p&gt;Essentially all nodes in the network are identical and you can specify multiple peers for initial connection establishment. &lt;br &#x2F;&gt;
+You can use either public ones, which can be viewed &lt;a href=&quot;https:&#x2F;&#x2F;uptime.easytier.cn&#x2F;&quot;&gt;here&lt;&#x2F;a&gt;, or specify one of your own nodes. &lt;br &#x2F;&gt;
+It doesn&#x27;t require any additional configuration.&lt;&#x2F;p&gt;
+&lt;p&gt;By the way, it has clients for Android, Windows and Mac OS, so it&#x27;s a good time to dig out those old games you didn&#x27;t finish in childhood and organize LAN party with friends who aren&#x27;t very tech-savvy.&lt;&#x2F;p&gt;
+&lt;p&gt;The main disadvantage is that you can&#x27;t bind IP addresses to specific machines.&lt;&#x2F;p&gt;
+&lt;p&gt;And yes, this is a project from China, which might not appeal to some for ideological reasons, but personally I hope it was created by enthusiasts specifically for breaking through the Great Firewall of China.&lt;&#x2F;p&gt;
+&lt;details&gt;
+&lt;summary&gt;Configuration example&lt;&#x2F;summary&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;networking&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;firewall &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;allowedTCPPorts &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;11010 11011 11012 &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;allowedUDPPorts &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;11010 11011 11012 &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;  };
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;environment&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;systemPackages &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;easytier &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;systemd&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;services&lt;&#x2F;span&gt;&lt;span&gt;.&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;easytier&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;enable &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;script &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;easytier-core -d --network-name sumeragi --network-secret changeme -p tcp:&#x2F;&#x2F;public.easytier.cn:11010 --dev-name et0 --multi-thread&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;serviceConfig &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Restart &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;always&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;RestartMaxDelaySec &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;1m&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;RestartSec &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;100ms&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;RestartSteps &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;9&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;User &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;root&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;wantedBy &lt;&#x2F;span&gt;&lt;span&gt;= [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;multi-user.target&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;after &lt;&#x2F;span&gt;&lt;span&gt;= [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;network.target&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;path &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;with &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span&gt;; [
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;easytier
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;iproute2
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;bash
+&lt;&#x2F;span&gt;&lt;span&gt;    ];
+&lt;&#x2F;span&gt;&lt;span&gt;  };
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+
+&lt;&#x2F;details&gt;
+&lt;h2 id=&quot;nebula&quot;&gt;Nebula&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;slackhq&#x2F;nebula&quot;&gt;GitHub&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;nebula.defined.net&#x2F;docs&#x2F;&quot;&gt;Official site&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;This is a more pompous commercial solution from the creators of Slack.&lt;&#x2F;p&gt;
+&lt;p&gt;It has elliptic curve encryption, suggests using its own PKI and looks generally reliable. &lt;br &#x2F;&gt;
+Though the prospect of manually distributing certificates to machines doesn&#x27;t thrill me.&lt;&#x2F;p&gt;
+&lt;p&gt;For its operation it requires &quot;lighthouses&quot; that will connect all other nodes. &lt;br &#x2F;&gt;
+Inside, everything works on &lt;a href=&quot;https:&#x2F;&#x2F;noiseprotocol.org&#x2F;&quot;&gt;Noise Protocol&lt;&#x2F;a&gt;. &lt;br &#x2F;&gt;
+On the outside it exposes only a single UDP port.&lt;&#x2F;p&gt;
+&lt;p&gt;Among the nice features there&#x27;s a firewall and zoning, to build slightly more complex networks than &quot;everyone with everyone.&quot;&lt;&#x2F;p&gt;
+&lt;p&gt;And also Nebula&#x27;s interface is absolutely shit. &lt;br &#x2F;&gt;
+Instead of a normal CLI, you need to configure an internal sshd and connect via SSH to localhost. &lt;br &#x2F;&gt;
+Maybe it&#x27;s more secure, but it&#x27;s utterly disgusting.&lt;&#x2F;p&gt;
+&lt;details&gt;
+&lt;summary&gt;ConfigurationExample&lt;&#x2F;summary&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;isLighthouse &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if &lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;config&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;networking&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;hostName &lt;&#x2F;span&gt;&lt;span&gt;== &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;lighthouse&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;then &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;else &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;in
+&lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;services&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;nebula&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;networks&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;sumeragi &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;enable &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;ca &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;etc&#x2F;nebula&#x2F;ca.crt&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;cert &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;etc&#x2F;nebula&#x2F;node.crt&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;key &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;etc&#x2F;nebula&#x2F;node.key&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;isLighthouse &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;isLighthouse&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;lighthouses &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if &lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;isLighthouse&lt;&#x2F;span&gt;&lt;span&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;then &lt;&#x2F;span&gt;&lt;span&gt;[] &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;else &lt;&#x2F;span&gt;&lt;span&gt;[ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.1.0.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;listen &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;host &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0.0.0.0&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;4242&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;staticHostMap &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.1.0.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;266.266.266.266:4242&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;settings &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;if &lt;&#x2F;span&gt;&lt;span&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;isLighthouse&lt;&#x2F;span&gt;&lt;span&gt;) &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;then &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;sshd &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;enabled &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;listen &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;127.0.0.1:2222&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;host_key &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;etc&#x2F;nebula&#x2F;id_ed25519&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;authorized_users &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;          {
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;user &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;nommy&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;keys &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;              &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ssh-ed25519 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;            ];
+&lt;&#x2F;span&gt;&lt;span&gt;          }
+&lt;&#x2F;span&gt;&lt;span&gt;        ];
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    } &lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;else &lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;firewall &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;outbound &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;        { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;any&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;proto &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;any&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;host &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;any&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; }
+&lt;&#x2F;span&gt;&lt;span&gt;      ];
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;inbound &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;        { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;any&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;proto &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;any&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;host &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;any&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; }
+&lt;&#x2F;span&gt;&lt;span&gt;      ];
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;  };
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;networking&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;firewall&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;allowedUDPPorts &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;4242 &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+
+&lt;&#x2F;details&gt;
+&lt;h2 id=&quot;tinc&quot;&gt;Tinc&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;gsliepen&#x2F;tinc&quot;&gt;GitHub&lt;&#x2F;a&gt;, &lt;a href=&quot;https:&#x2F;&#x2F;tinc-vpn.org&#x2F;&quot;&gt;Official site&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;When I found this, my first thought was &quot;The fuck is this?&quot; &lt;br &#x2F;&gt;
+The project is over 10 years old and is still in an unstable state. &lt;br &#x2F;&gt;
+The current version is &lt;code&gt;1.1pre18&lt;&#x2F;code&gt;, released way back in 2021. &lt;br &#x2F;&gt;
+The last commit to the &lt;code&gt;1.1&lt;&#x2F;code&gt; branch was over a year ago. &lt;br &#x2F;&gt;
+It&#x27;s packaged in Nix as Lucy knows what. &lt;br &#x2F;&gt;
+How is this even a thing?&lt;&#x2F;p&gt;
+&lt;p&gt;But actually, Tinc can surprise you quite a bit.&lt;&#x2F;p&gt;
+&lt;p&gt;Under the hood it uses its own protocol over UDP, elliptic curves and a ton of black magic (which, by the way, is properly documented) that makes it all work.&lt;&#x2F;p&gt;
+&lt;p&gt;Of course, it still needs a node for initial connection bootstrapping, but there&#x27;s no special setup required — any node can do it, and afterwards it&#x27;s all direct node-to-node communication.&lt;&#x2F;p&gt;
+&lt;p&gt;It has a relatively normal CLI, can show a graph of the entire network, has other tasty features, but really lacks some kind of TUI, or at least ASCII art for rendering that graph.&lt;&#x2F;p&gt;
+&lt;details&gt;
+&lt;summary&gt;Example of not very good configuration&lt;&#x2F;summary&gt;
+&lt;p&gt;For obvious reasons, the configuration was assembled in a dendrofecal manner, I strongly advise not copying it as-is, but rewriting it yourself.&lt;&#x2F;p&gt;
+&lt;p&gt;Yes, interface and route configuration is done through &lt;code&gt;tinc-up&lt;&#x2F;code&gt; and &lt;code&gt;tinc-down&lt;&#x2F;code&gt;. &lt;br &#x2F;&gt;
+This is the &lt;a href=&quot;https:&#x2F;&#x2F;tinc-vpn.org&#x2F;documentation-1.1&#x2F;Interface-configuration.html&quot;&gt;intended way&lt;&#x2F;a&gt;&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;let
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;hostName &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;config&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;networking&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;hostName&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#b48ead;&quot;&gt;in
+&lt;&#x2F;span&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;networking&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;firewall&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;allowedTCPPorts &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;655 &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;networking&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;firewall&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;allowedUDPPorts &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;655 &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;services&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;tinc &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;networks &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;sumeragi &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;hostName&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;ed25519PrivateKeyFile &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;etc&#x2F;tinc&#x2F;sumeragi&#x2F;ed25519_key.priv&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;interfaceType &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tun&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;debugLevel &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;hostSettings &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;lighthouse &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;settings&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Ed25519PublicKey &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;subnets &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;              { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.2.0.1&#x2F;32&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; }
+&lt;&#x2F;span&gt;&lt;span&gt;            ];
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;addresses &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;              { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;266.266.266.266&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;655&lt;&#x2F;span&gt;&lt;span&gt;; }
+&lt;&#x2F;span&gt;&lt;span&gt;            ];
+&lt;&#x2F;span&gt;&lt;span&gt;          };
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;laptop &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;settings&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Ed25519PublicKey &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;subnets &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;              { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.2.0.2&#x2F;32&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; }
+&lt;&#x2F;span&gt;&lt;span&gt;            ];
+&lt;&#x2F;span&gt;&lt;span&gt;          };
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;rpi &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;settings&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;Ed25519PublicKey &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;            &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;subnets &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;              { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.2.0.3&#x2F;32&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; }
+&lt;&#x2F;span&gt;&lt;span&gt;            ];
+&lt;&#x2F;span&gt;&lt;span&gt;          };
+&lt;&#x2F;span&gt;&lt;span&gt;        };
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;  };
+&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;environment&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;etc &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tinc&#x2F;sumeragi&#x2F;tinc-up&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;source &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;writeScript &lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tinc-up-sumeragi&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;#39;&amp;#39;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;        #!&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;stdenv&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;shell&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;nettools&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;bin&#x2F;ifconfig $INTERFACE &lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#b48ead;&quot;&gt;(&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#d08770;&quot;&gt;builtins&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;elemAt config&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;services&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;tinc&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;networks&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;sumeragi&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;hostSettings&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;hostName&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;subnets &lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#b48ead;&quot;&gt;)&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;address&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt; netmask 255.255.255.0
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;        &#x2F;run&#x2F;current-system&#x2F;sw&#x2F;bin&#x2F;ip r add 10.2.0.0&#x2F;24 dev tinc.sumeragi
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;    &lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tinc&#x2F;sumeragi&#x2F;tinc-down&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;source &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;writeScript &lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tinc-down-sumeragi&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;#39;&amp;#39;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;        #!&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;stdenv&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;shell&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;pkgs&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#c0c5ce;&quot;&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;nettools&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;bin&#x2F;ifconfig $INTERFACE down
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;        &#x2F;run&#x2F;current-system&#x2F;sw&#x2F;bin&#x2F;ip r del 10.2.0.0&#x2F;24 dev tinc.sumeragi
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;    &lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;  };
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+
+&lt;&#x2F;details&gt;
+&lt;h1 id=&quot;methodology-of-measurment&quot;&gt;Methodology of measurment&lt;&#x2F;h1&gt;
+&lt;p&gt;This is actually a huge topic and you could write a whole book about it, but the most important thing is — IPerf lies. &lt;br &#x2F;&gt;
+Different versions of IPerf show different numbers, use different measurement methodologies by default, have many tuning options that affect results, and sometimes their readings differ significantly from reality.&lt;&#x2F;p&gt;
+&lt;p&gt;So along with two versions of IPerf, it&#x27;s worth adding some real-world network usage cases.&lt;&#x2F;p&gt;
+&lt;p&gt;Internet speeds in both directions are roughly the same for all nodes, so I&#x27;ll take numbers from the first direction that comes up, since the difference will be within the margin of error.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;infrastructure&quot;&gt;Infrastructure&lt;&#x2F;h2&gt;
+&lt;p&gt;For realistic measurements I&#x27;ll use three machines:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;Home laptop (&lt;strong&gt;Laptop&lt;&#x2F;strong&gt;) in Spain&lt;&#x2F;li&gt;
+&lt;li&gt;Intermediate server with public IP (&lt;strong&gt;Lighthouse&lt;&#x2F;strong&gt;) in Finland&lt;&#x2F;li&gt;
+&lt;li&gt;Raspberry Pi (&lt;strong&gt;RPi&lt;&#x2F;strong&gt;) behind the Russian firewall&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;The mesh network coordinators are hosted on Lighthouse, while speed is measured between Laptop and RPi.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;ping&quot;&gt;Ping&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;code&gt;ping -c 300 10.1.0.3&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We send ICMP packets, wait for the response to arrive, measure the time it took to get the response. &lt;br &#x2F;&gt;
+Here we can check latency, jittering and the number of lost packets.&lt;&#x2F;p&gt;
+&lt;p&gt;Latency is the average ping response time. &lt;br &#x2F;&gt;
+Jittering is how much the response time &quot;wanders&quot; relative to the average. Measured in ms. &lt;br &#x2F;&gt;
+The number of lost packets is self-explanatory.&lt;&#x2F;p&gt;
+&lt;p&gt;For more or less stable results, 300 packets should be enough.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;dev-zero-through-ssh&quot;&gt;&#x2F;dev&#x2F;zero through SSH&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;code&gt;ssh 10.1.0.3 &#x27;dd if=&#x2F;dev&#x2F;zero bs=128M count=3 2&amp;gt;&#x2F;dev&#x2F;null&#x27; | dd of=&#x2F;dev&#x2F;null status=progress&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;We read three times 128 MB of zeros through SSH, then look at the reading speed. &lt;br &#x2F;&gt;
+Generally not a bad way to determine data transfer speed inside an SSH tunnel.&lt;&#x2F;p&gt;
+&lt;p&gt;The main reason for using this test is that through some solutions SSH works so hellishly slow that more than a second can pass between pressing a key and the character appearing on screen, which is completely unacceptable. &lt;br &#x2F;&gt;
+And sometimes it doesn&#x27;t work at all.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;wget&quot;&gt;Wget&lt;&#x2F;h2&gt;
+&lt;p&gt;&lt;code&gt;wget 10.1.0.3:5201&#x2F;testfile&lt;&#x2F;code&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;As a test file — the same 384 MB of zeros from &#x2F;dev&#x2F;null.&lt;&#x2F;p&gt;
+&lt;p&gt;As a server I use &lt;a href=&quot;https:&#x2F;&#x2F;github.com&#x2F;TheWaWaR&#x2F;simple-http-server&quot;&gt;simple-http-server&lt;&#x2F;a&gt;, setting the number of threads equal to the number of CPU cores (8). &lt;br &#x2F;&gt;
+Of course, with compression disabled, otherwise megabytes of zeros risk turning into kilobytes of headers.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;iperf2-and-iperf3&quot;&gt;iperf2 and iperf3&lt;&#x2F;h1&gt;
+&lt;p&gt;Yes, they show orange prices in Africa. Hell knows how to tune this. &lt;br &#x2F;&gt;
+So we just run them with standard configuration and then normalize the results from megabits to megabytes.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;reference-values&quot;&gt;Reference values&lt;&#x2F;h2&gt;
+&lt;p&gt;Measuring exact values for speed, ping and all this stuff that we could use as a baseline is somewhat impossible, since both machines are behind NAT. &lt;br &#x2F;&gt;
+But since the infrastructure includes a Lighthouse with a public IP, we can run a few tests and fantasize about some results.&lt;&#x2F;p&gt;
+&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;&lt;&#x2F;th&gt;&lt;th&gt;ICMP packet loss&lt;&#x2F;th&gt;&lt;th&gt;ICMP Latency&lt;&#x2F;th&gt;&lt;th&gt;ICMP Jittering&lt;&#x2F;th&gt;&lt;th&gt;&#x2F;dev&#x2F;zero through SSH&lt;&#x2F;th&gt;&lt;th&gt;Wget&lt;&#x2F;th&gt;&lt;th&gt;iperf2&lt;&#x2F;th&gt;&lt;th&gt;iperf3&lt;&#x2F;th&gt;&lt;&#x2F;tr&gt;&lt;&#x2F;thead&gt;&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;Laptop -&amp;gt; Lighthouse&lt;&#x2F;td&gt;&lt;td&gt;0%&lt;&#x2F;td&gt;&lt;td&gt;71.879 ms&lt;&#x2F;td&gt;&lt;td&gt;1.422 ms&lt;&#x2F;td&gt;&lt;td&gt;25.5 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;23.3 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;18 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;24.375 MB&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;tr&gt;&lt;td&gt;RPi -&amp;gt; Lighthouse&lt;&#x2F;td&gt;&lt;td&gt;0%&lt;&#x2F;td&gt;&lt;td&gt;51.872 ms&lt;&#x2F;td&gt;&lt;td&gt;1.011 ms&lt;&#x2F;td&gt;&lt;td&gt;9.0 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;Timeout&lt;&#x2F;td&gt;&lt;td&gt;9.963 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;11.112 MB&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;&#x2F;tbody&gt;&lt;&#x2F;table&gt;
+&lt;p&gt;Now we can start fantasizing.&lt;&#x2F;p&gt;
+&lt;p&gt;Speed between nodes is limited by the slowest link, so we use the minimum values as our reference.&lt;br &#x2F;&gt;
+Latencies can simply be added together. But what to do with jittering isn&#x27;t entirely clear. &lt;br &#x2F;&gt;
+Supposedly you can&#x27;t add such values, &lt;br &#x2F;&gt;
+I don&#x27;t want to recalculate every packet manually, so I&#x27;ll just take the maximum value.&lt;&#x2F;p&gt;
+&lt;p&gt;And it&#x27;s time for the final results.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;results&quot;&gt;Results&lt;&#x2F;h1&gt;
+&lt;p&gt;All speeds are normalized in bytes. To convert to bits, multiply by 8.&lt;&#x2F;p&gt;
+&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;&lt;&#x2F;th&gt;&lt;th&gt;ICMP packet loss&lt;&#x2F;th&gt;&lt;th&gt;ICMP Latency&lt;&#x2F;th&gt;&lt;th&gt;ICMP Jittering&lt;&#x2F;th&gt;&lt;th&gt;&#x2F;dev&#x2F;zero through SSH&lt;&#x2F;th&gt;&lt;th&gt;Wget&lt;&#x2F;th&gt;&lt;th&gt;iperf2&lt;&#x2F;th&gt;&lt;th&gt;iperf3&lt;&#x2F;th&gt;&lt;&#x2F;tr&gt;&lt;&#x2F;thead&gt;&lt;tbody&gt;
+&lt;tr&gt;&lt;td&gt;Reference&lt;&#x2F;td&gt;&lt;td&gt;0%&lt;&#x2F;td&gt;&lt;td&gt;123.751 ms&lt;&#x2F;td&gt;&lt;td&gt;1.422 ms&lt;&#x2F;td&gt;&lt;td&gt;9.0 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;Timeout&lt;&#x2F;td&gt;&lt;td&gt;9.963 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;11.112 MB&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;tr&gt;&lt;td&gt;Wireguard + udp2raw&lt;&#x2F;td&gt;&lt;td&gt;49.6%&lt;&#x2F;td&gt;&lt;td&gt;108.806 ms&lt;&#x2F;td&gt;&lt;td&gt;3.724 ms&lt;&#x2F;td&gt;&lt;td&gt;Timeout&lt;&#x2F;td&gt;&lt;td&gt;Timeout&lt;&#x2F;td&gt;&lt;td&gt;3.175 KB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;0.00 B&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;tr&gt;&lt;td&gt;EasyTier&lt;&#x2F;td&gt;&lt;td&gt;0%&lt;&#x2F;td&gt;&lt;td&gt;153.163 ms&lt;&#x2F;td&gt;&lt;td&gt;36.290 ms&lt;&#x2F;td&gt;&lt;td&gt;2.7 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;8.09 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;6.15 KB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;0.00 B&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;tr&gt;&lt;td&gt;Nebula&lt;&#x2F;td&gt;&lt;td&gt;0%&lt;&#x2F;td&gt;&lt;td&gt;122.173 ms&lt;&#x2F;td&gt;&lt;td&gt;15.054 ms&lt;&#x2F;td&gt;&lt;td&gt;2.7 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;3.40 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;5.975 KB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;0.00 B&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;tr&gt;&lt;td&gt;Tinc&lt;&#x2F;td&gt;&lt;td&gt;2.3%&lt;&#x2F;td&gt;&lt;td&gt;115.065 ms&lt;&#x2F;td&gt;&lt;td&gt;3.393 ms&lt;&#x2F;td&gt;&lt;td&gt;14.7 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;5.16 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;6.488 MB&#x2F;s&lt;&#x2F;td&gt;&lt;td&gt;4.175 MB&#x2F;s&lt;&#x2F;td&gt;&lt;&#x2F;tr&gt;
+&lt;&#x2F;tbody&gt;&lt;&#x2F;table&gt;
+&lt;p&gt;Egyptian power of those iperfs...&lt;&#x2F;p&gt;
+&lt;p&gt;Tinc, as I already said, is very capable of surprising.&lt;&#x2F;p&gt;
+&lt;p&gt;EasyTier can be forgiven for such overheads, it&#x27;s ad-hoc after all and generally &quot;be thankful there&#x27;s any connection at all.&quot;&lt;&#x2F;p&gt;
+&lt;p&gt;But Nebula frankly disappointed me. Here I really want to crack a joke about the Slack client on Electron, but... I expected better, seriously.&lt;&#x2F;p&gt;
+&lt;p&gt;So if you want to get something like this — Tinc is the best choice performance-wise. &lt;br &#x2F;&gt;
+I&#x27;ll keep all of them at once for myself. &lt;br &#x2F;&gt;
+I don&#x27;t like launching Mars rovers unnecessarily.&lt;&#x2F;p&gt;
+&lt;p&gt;That&#x27;s all, folks.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;br &#x2F;&gt;
+&lt;br &#x2F;&gt;
+&lt;br &#x2F;&gt;
+&lt;em&gt;And it all started when mom asked me to fix the robot vacuum...&lt;&#x2F;em&gt;&lt;&#x2F;p&gt;
+</content>
+        
+    </entry>
+    <entry xml:lang="en">
+        <title>Connecting Tasmota to Home Assistant and other weird noname devices</title>
+        <published>2025-03-12T00:00:00+00:00</published>
+        <updated>2025-03-12T00:00:00+00:00</updated>
+        
+        <author>
+          <name>
+            
+              Unknown
+            
+          </name>
+        </author>
+        
+        <link rel="alternate" type="text/html" href="https://blog.nommy.moe/blog/tasmota-tuya-perversions/"/>
+        <id>https://blog.nommy.moe/blog/tasmota-tuya-perversions/</id>
+        
+        <content type="html" xml:base="https://blog.nommy.moe/blog/tasmota-tuya-perversions/">&lt;h1 id=&quot;what-problem-do-we-have&quot;&gt;What problem do we have?&lt;&#x2F;h1&gt;
+&lt;p&gt;One day, a very naughty person decided that wiring the whole house (including the electric stove) on a single 2.5mm² cable was a very good idea.&lt;&#x2F;p&gt;
+&lt;p&gt;Fire safety regulations and automatic fuses didn&#x27;t agree with this fact.&lt;&#x2F;p&gt;
+&lt;p&gt;So turning on the boiler and the oven at the same time causes a complete power outage in a single apartment, which frustrates me a lot. And going to unplug the boiler every time when I want to cook something is definitely not the thing that I want to do.&lt;&#x2F;p&gt;
+&lt;p&gt;And because of this we are going to make a smart home so that I can control the boiler at least from my smartphone.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;las-planchas&quot;&gt;Las Planchas&lt;&#x2F;h1&gt;
+&lt;p&gt;A quick search on Amazon gave me &lt;code&gt;SONOFF Zigbee Bridge 3.0 Gateway Hub, ,Soporte de Protocolo Dual,WiFi, Compatible con Dispositivos Zigbee Pro, Alexa &amp;amp; Google&lt;&#x2F;code&gt;, also known as &lt;code&gt;SONOFF ZBBridge-P&lt;&#x2F;code&gt; only for 35€. &lt;br &#x2F;&gt;
+A quick googling revealed that there&#x27;s some kind of opensource firmware for it. “I should buy it”, I thought.&lt;&#x2F;p&gt;
+&lt;p&gt;At the same time to the cart went &lt;code&gt;ZigBee Enchufe Inteligente Alexa 16A, 3680W Smart Plug con Monitor de Energía, Enchufe Temporizador con Control Remoto, Control por Voz y Funciones de Temporización, apoyo Alexa &amp;amp; Google Home&lt;&#x2F;code&gt; (4 pieces for 45€), which later turned out to be &lt;code&gt;Tuya TS011F&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;And also for the change was thrown in &lt;code&gt;Garza Smart - Bombilla LED Zigbee Estándar A60, 11W (equivale a 75W de incandescencia), E27, Requiere Puente&#x2F;Bridge, RGB + CCT, Intensidad regulable, Programable, Control por voz y app, Alexa&#x2F;Google&lt;&#x2F;code&gt;, which for some reason pretended to be &lt;code&gt;Tuya TZ3210&lt;&#x2F;code&gt;. &lt;br &#x2F;&gt;
+What exactly this &lt;code&gt;TZ3210&lt;&#x2F;code&gt; means, I have not been able to establish. Various sources say that it is either a switch, a humidity and temperature sensor, or as I can guess an RGB lightbulb.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;curing-the-bridge-from-the-cloud&quot;&gt;Curing the bridge from the cloud&lt;&#x2F;h1&gt;
+&lt;p&gt;Since it&#x27;s &lt;em&gt;mauvais&lt;&#x2F;em&gt; to dump all smart home data to some obscure cloud, the first thing to do is to put a new firmware to the bridge.&lt;&#x2F;p&gt;
+&lt;p&gt;I followed this very detailed instruction &lt;a href=&quot;https:&#x2F;&#x2F;notenoughtech.com&#x2F;home-automation&#x2F;tasmota-on-sonoff-zb-bridge-pro&#x2F;&quot;&gt;How to flash Tasmota on Sonoff ZB Bridge Pro&lt;&#x2F;a&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;The only thing that caused some confusion is the &lt;code&gt;GPIO00&lt;&#x2F;code&gt; pin. It should be pulled up to &lt;code&gt;GND&lt;&#x2F;code&gt; during the startup to put this &lt;em&gt;la plancha&lt;&#x2F;em&gt; into UART mode. &lt;br &#x2F;&gt;
+I had some difficult time trying to understand what went wrong, so you can track the successfulness of this operation with elegant &lt;code&gt;screen &#x2F;dev&#x2F;ttyACM0 115200&lt;&#x2F;code&gt; and then look at the startup logs.&lt;&#x2F;p&gt;
+&lt;p&gt;I won&#x27;t describe the complete flashing process, as it&#x27;s perfectly described in the link above, but...&lt;&#x2F;p&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;how-to-get-heart-attack.jpg&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 1. How to suddenly get a heart attack&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+&lt;p&gt;Fortunately, this bug was fixed a long time ago and someone just didn&#x27;t update their Flipper&#x27;s firmware for a long time.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;setting-up-secured-mqtt&quot;&gt;Setting up secured MQTT&lt;&#x2F;h1&gt;
+&lt;p&gt;Despite the fact that ESP32 already has Wireguard implementation, Tasmota still doesn&#x27;t support it, so I have to put MQTT server outside and configure SSL on it, so that random vanderers don&#x27;t have fun with my sockets.&lt;&#x2F;p&gt;
+&lt;p&gt;And with a slight &lt;code&gt;nixos-rebuild switch ...&lt;&#x2F;code&gt;, we will put Mosquitto on an external server with a static IP&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;users&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;users&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mosquitto&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;extraGroups &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;nginx&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ]&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;services&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mosquitto &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;enable &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;listeners &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;    {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;123.456.789.123&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1883&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;users &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;tasmota &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;acl &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;            &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;readwrite tasmota&#x2F;#&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;          ];
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;password &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;changeme&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        };
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;settings &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;allow_anonymous&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;require_certificate&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;false&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;cafile&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;var&#x2F;lib&#x2F;acme&#x2F;mqtt.example.com&#x2F;fullchain.pem&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;certfile&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;var&#x2F;lib&#x2F;acme&#x2F;mqtt.example.com&#x2F;cert.pem&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;keyfile&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;var&#x2F;lib&#x2F;acme&#x2F;mqtt.example.com&#x2F;key.pem&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tls_version&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tlsv1.2&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;    {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.20.0.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1883&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;users &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;hass &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;acl &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;            &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;readwrite #&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;          ];
+&lt;&#x2F;span&gt;&lt;span&gt;          &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;password &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;changeme&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        };
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  ];
+&lt;&#x2F;span&gt;&lt;span&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;The &lt;code&gt;mosquitto&lt;&#x2F;code&gt; user was sent to the &lt;code&gt;nginx&lt;&#x2F;code&gt; group just to be able to use Let&#x27;s Encrypt certificates.&lt;&#x2F;p&gt;
+&lt;p&gt;I&#x27;m also using a system with two listeners. One is SSL protected, restricted to the core and looks outside, and the second one is in the internal VPN network, allowing to connect other clients, but about this later&lt;&#x2F;p&gt;
+&lt;p&gt;Also worth noting are the lines &lt;code&gt;“require_certificate” = false;&lt;&#x2F;code&gt; and &lt;code&gt;“tls_version” = “tlsv1.2&lt;&#x2F;code&gt;. &lt;br &#x2F;&gt;
+First line disables TLS authorization, leaving the password one, and the second enables traffic encryption. &lt;br &#x2F;&gt;
+Without the first one Tasmota cannot connect to MQTT, and without the second one Mosquitto will ignore all configured certificates and will work in unencrypted mode.&lt;&#x2F;p&gt;
+&lt;p&gt;On the Home Assistant side I have configured a bridge that will take all messages from the external MQTT and put them into the main MQTT. &lt;br &#x2F;&gt;
+Just because I already had MQTT configured for local stuff and didn&#x27;t want to touch it.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;services&lt;&#x2F;span&gt;&lt;span&gt;.&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mosquitto &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;enable &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;listeners &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;...&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span&gt;  ];
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;bridges &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;external2internal&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; = {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;addresses &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;        { &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;address &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;10.20.0.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;; &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;port &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1883&lt;&#x2F;span&gt;&lt;span&gt;; }
+&lt;&#x2F;span&gt;&lt;span&gt;      ];
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;topics &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;# in&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;# out&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;      ];
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;settings &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;remote_username &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;hass&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;remote_password &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;changeme&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;  };
+&lt;&#x2F;span&gt;&lt;span&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;With this topics setup, I don&#x27;t pull anything extra inside, and only direct commands for Tasmota can go outside.&lt;&#x2F;p&gt;
+&lt;p&gt;But of course this can be skipped if there is only one MQTT.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;AND DON&#x27;T FORGET TO OPEN THE PORT ON YOUR FIREWALL!&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;connecting-the-bridge-to-the-secured-mqtt&quot;&gt;Connecting the bridge to the secured MQTT&lt;&#x2F;h1&gt;
+
+  
+  
+    
+    
+  
+  &lt;img src=&quot;https:&#x2F;&#x2F;blog.nommy.moe&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;tasmota-mqtt-settings.png&quot; class=&quot;center&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+
+&lt;p&gt;It&#x27;s already obvious and self-explanatory here, except for a couple things.&lt;&#x2F;p&gt;
+&lt;p&gt;Be sure to click the &lt;code&gt;MQTT TLS&lt;&#x2F;code&gt; checkbox so that it will be able to connect to our secure Mosquitto.&lt;&#x2F;p&gt;
+&lt;p&gt;And in the &lt;code&gt;Full Topic&lt;&#x2F;code&gt; field you should add &lt;code&gt;tasmota&#x2F;&lt;&#x2F;code&gt; in the beginning, so that all messages are neatly piled into one group and we won&#x27;t write each bridge address into ACL.&lt;&#x2F;p&gt;
+&lt;p&gt;After pairing devices with the bridge (Just press the &lt;code&gt;Zigbee Permit Join&lt;&#x2F;code&gt; button and turn on &lt;em&gt;las planchas&lt;&#x2F;em&gt;), it is not unreasonable to check if everything is working properly and the messages from the devices are getting to MQTT. &lt;br &#x2F;&gt;
+Subscribe to &lt;code&gt;tasmota&#x2F;#&lt;&#x2F;code&gt; and wait for something to be appeared there.&lt;&#x2F;p&gt;
+&lt;p&gt;If nothing appeared for a long time, go back to the beginning and think about what can went wrong.&lt;&#x2F;p&gt;
+&lt;p&gt;Repeat until you are completely satisfied.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;exploring-the-devices&quot;&gt;Exploring the devices&lt;&#x2F;h1&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;sonoff-bridge.jpg&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 2. SONOFF ZB Bridge-P&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+&lt;p&gt;This is where the hell and Wisconsin begins.&lt;&#x2F;p&gt;
+&lt;p&gt;The thing is that Tasmota can&#x27;t do auto discovery. To be more precise, it can, but only for Tasmota running end devices and through their own plugin. &lt;br &#x2F;&gt;
+And since we have a bridge, two facts follow from this:&lt;&#x2F;p&gt;
+&lt;ol&gt;
+&lt;li&gt;We don&#x27;t need a plugin, raw MQTT is more than enough.&lt;&#x2F;li&gt;
+&lt;li&gt;No one will help us.&lt;&#x2F;li&gt;
+&lt;&#x2F;ol&gt;
+&lt;p&gt;But first we should arm ourselves with the console on the bridge itself and see what we have there.&lt;&#x2F;p&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;tasmota-console.png&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 3. Green and scary&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+&lt;p&gt;We go to &lt;code&gt;Tools &amp;gt; Console&lt;&#x2F;code&gt; in the bridge web interface and start poking everything around with a stick.&lt;&#x2F;p&gt;
+&lt;p&gt;The full list of commands can be found here: &lt;a href=&quot;https:&#x2F;&#x2F;tasmota.github.io&#x2F;docs&#x2F;Commands&#x2F;&quot;&gt;Tasmota Commands&lt;&#x2F;a&gt;, but now we are only interested in the &lt;a href=&quot;https:&#x2F;&#x2F;tasmota.github.io&#x2F;docs&#x2F;Commands&#x2F;#zigbee&quot;&gt;Zigbee&lt;&#x2F;a&gt; part.&lt;&#x2F;p&gt;
+&lt;p&gt;To be more precise, the commands &lt;code&gt;ZbInfo&lt;&#x2F;code&gt;, &lt;code&gt;ZbName&lt;&#x2F;code&gt; and &lt;code&gt;ZbSend&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;zbinfo&quot;&gt;ZbInfo&lt;&#x2F;h3&gt;
+&lt;p&gt;By typing &lt;code&gt;ZbInfo&lt;&#x2F;code&gt; into the terminal, you can get (mostly) all information about the connected devices. &lt;br &#x2F;&gt;
+The result is usually a mess like this&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;03&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;18.524&lt;&#x2F;span&gt;&lt;span&gt; MQT: tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;A&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;65&lt;&#x2F;span&gt;&lt;span&gt;EC&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;7E20&lt;&#x2F;span&gt;&lt;span&gt;&#x2F;SENSOR = {&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x7E20&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x7E20&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;main_light_0&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C138E23EE90340&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS0505B&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3210_4sku4dkz&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;242&lt;&#x2F;span&gt;&lt;span&gt;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;~01.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;L01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Dimmer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;254&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hue&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Sat&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;X&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;24218&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Y&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;15601&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;CT&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;499&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ColorMode&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGB&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FFFFFF&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGBb&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FFFFFF&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;4&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806194&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;91&lt;&#x2F;span&gt;&lt;span&gt;}}}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;03&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;18.536&lt;&#x2F;span&gt;&lt;span&gt; MQT: tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;A&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;65&lt;&#x2F;span&gt;&lt;span&gt;EC&#x2F;CD&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;47&lt;&#x2F;span&gt;&lt;span&gt;&#x2F;SENSOR = {&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xCD47&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xCD47&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;aquarium_light&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C1382214F48A12&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;P01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RMSVoltage&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;226&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ActivePower&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;10&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806192&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;185&lt;&#x2F;span&gt;&lt;span&gt;}}}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;03&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;18.548&lt;&#x2F;span&gt;&lt;span&gt; MQT: tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;A&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;65&lt;&#x2F;span&gt;&lt;span&gt;EC&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;9&lt;&#x2F;span&gt;&lt;span&gt;AD&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;4&lt;&#x2F;span&gt;&lt;span&gt;&#x2F;SENSOR = {&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;boiler_switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C13877C8106300&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS011F&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3000_cehuw1lw&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;P01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RMSVoltage&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;226&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ActivePower&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;73&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806125&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;98&lt;&#x2F;span&gt;&lt;span&gt;}}}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;03&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;18.563&lt;&#x2F;span&gt;&lt;span&gt; MQT: tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;A&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;65&lt;&#x2F;span&gt;&lt;span&gt;EC&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;3&lt;&#x2F;span&gt;&lt;span&gt;B&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;30&lt;&#x2F;span&gt;&lt;span&gt;&#x2F;SENSOR = {&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x3B30&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x3B30&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;main_light_1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C1381A825F2ADE&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS0505B&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3210_4sku4dkz&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;242&lt;&#x2F;span&gt;&lt;span&gt;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;~01.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;L01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Dimmer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;254&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hue&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Sat&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;254&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;X&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;38449&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Y&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;21476&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;CT&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;283&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ColorMode&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGB&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FF0000&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGBb&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FF0000&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;136&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806062&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;163&lt;&#x2F;span&gt;&lt;span&gt;}}}
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;20&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;03&lt;&#x2F;span&gt;&lt;span&gt;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;18.578&lt;&#x2F;span&gt;&lt;span&gt; MQT: tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;6&lt;&#x2F;span&gt;&lt;span&gt;A&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;65&lt;&#x2F;span&gt;&lt;span&gt;EC&#x2F;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;898&lt;&#x2F;span&gt;&lt;span&gt;A&#x2F;SENSOR = {&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x898A&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:{&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x898A&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;studio_light&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C1389F99E433CE&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS0505B&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3210_4sku4dkz&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;242&lt;&#x2F;span&gt;&lt;span&gt;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:[&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;~01.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;L01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;],&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Dimmer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;42&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hue&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Sat&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;254&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;X&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;13578&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Y&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;14165&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;CT&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;283&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ColorMode&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;2&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGB&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FF0000&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGBb&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;2A0000&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;150&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806048&lt;&#x2F;span&gt;&lt;span&gt;,&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;:&lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;65&lt;&#x2F;span&gt;&lt;span&gt;}}}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;If you sit and read carefully, you can find:&lt;&#x2F;p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Device&lt;&#x2F;code&gt; - Short device address (0xAAAA). Usually used to refer to the device.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;ModelId&lt;&#x2F;code&gt; and &lt;code&gt;Manufacturer&lt;&#x2F;code&gt; - The actual description of the model. If you look at the beginning of the article, you can see that cheap Chinese Tuya can be found under various pathos brands, but this is the place where the truth is revealed.&lt;&#x2F;li&gt;
+&lt;li&gt;&lt;code&gt;Dimmer&lt;&#x2F;code&gt;, &lt;code&gt;Hue&lt;&#x2F;code&gt;, &lt;code&gt;Sat&lt;&#x2F;code&gt;, &lt;code&gt;X&lt;&#x2F;code&gt;, &lt;code&gt;Y&lt;&#x2F;code&gt; and all other hardware-specific parameters that this device will send to MQTT.&lt;&#x2F;li&gt;
+&lt;&#x2F;ul&gt;
+&lt;p&gt;The last ones will be especially useful for us, but we will talk about it later.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;zbname&quot;&gt;ZbName&lt;&#x2F;h3&gt;
+&lt;p&gt;Now it&#x27;s about time to give all devices readable names so that we don&#x27;t get confused later.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;ZbName short_address,name&lt;&#x2F;code&gt; will help us with this. The name, that we will give tp the device will pop up in every event and we can do something using it, but the main goal is just not to get confused with different addresses.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;zbsend&quot;&gt;ZbSend&lt;&#x2F;h3&gt;
+&lt;p&gt;And now we can actively poke the device with the stick, because &lt;code&gt;ZbSend&lt;&#x2F;code&gt; allows us to send different messages and see how the device reacts.&lt;&#x2F;p&gt;
+&lt;p&gt;We can, for example, put a stick in the smart socket.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;ZbSend { “device”: “0x9AD4”, “send”: { “power”: “ON“ }}&lt;&#x2F;code&gt; will turn the smart socket on, and &lt;code&gt;ZbSend {”device&quot;: ‘0x9AD4’, ‘send’: { “Power”: “OFF” }}&lt;&#x2F;code&gt; will turn it off, correspondingly.&lt;&#x2F;p&gt;
+&lt;p&gt;How we know, that we need to send message &lt;code&gt;{ “Power”: “ON” }&lt;&#x2F;code&gt;? It&#x27;s the most interesting question.&lt;&#x2F;p&gt;
+&lt;p&gt;And the answer to it would be &lt;em&gt;&quot;just guessed&quot;&lt;&#x2F;em&gt;, but that&#x27;s not actually true.&lt;&#x2F;p&gt;
+&lt;p&gt;Let&#x27;s take a closer look at the JSON from the output of the &lt;code&gt;ZbInfo 0x9AD4&lt;&#x2F;code&gt; command&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;boiler_switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C13877C8106300&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS011F&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3000_cehuw1lw&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;P01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RMSVoltage&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;226&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ActivePower&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;73&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806125&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;98
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Among other things, here we can see the &lt;code&gt;Power&lt;&#x2F;code&gt; field with the value &lt;code&gt;0&lt;&#x2F;code&gt;, i.e. “Off”. &lt;br &#x2F;&gt;
+And the trick with more readable &lt;code&gt;ON&lt;&#x2F;code&gt; and &lt;code&gt;OFF&lt;&#x2F;code&gt; I just found up in the Internets.&lt;&#x2F;p&gt;
+&lt;p&gt;And if you look at the JSON from the lightbulb, there&#x27;s more interesting stuff here.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x7E20&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x7E20&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;main_light_0&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C138E23EE90340&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS0505B&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3210_4sku4dkz&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;242
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;~01.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;L01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Dimmer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;254&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hue&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Sat&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;X&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;24218&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Y&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;15601&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;CT&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;499&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ColorMode&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGB&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FFFFFF&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGBb&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FFFFFF&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;4&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806194&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;91
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;In addition to &lt;code&gt;Power&lt;&#x2F;code&gt; we also have &lt;code&gt;Dimmer&lt;&#x2F;code&gt;, &lt;code&gt;Hue&lt;&#x2F;code&gt;, &lt;code&gt;Sat&lt;&#x2F;code&gt;, &lt;code&gt;X&lt;&#x2F;code&gt;, &lt;code&gt;Y&lt;&#x2F;code&gt;, &lt;code&gt;CT&lt;&#x2F;code&gt;, &lt;code&gt;ColorMode&lt;&#x2F;code&gt;, &lt;code&gt;RGB&lt;&#x2F;code&gt; and &lt;code&gt;RGBb&lt;&#x2F;code&gt;. &lt;br &#x2F;&gt;
+Spoiler: not all of these can be changed in the same way, but we have a general direction for digging for the API.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;one-more-thing-to-mention-backlog&quot;&gt;One more thing to mention (Backlog)&lt;&#x2F;h3&gt;
+&lt;p&gt;Ah, yes. There&#x27;s one more thing to mention.&lt;&#x2F;p&gt;
+&lt;p&gt;Even though we can do &lt;code&gt;ZbSend { “device”: “0x7E20”, “send”: { “hue”: “128” }}&lt;&#x2F;code&gt;, &lt;br &#x2F;&gt;
+We can&#x27;t do &lt;code&gt;ZbSend { “device”: “0x7E20”, “send”: { “hue”: “128”, “sat”: “254” }}&lt;&#x2F;code&gt; because we can change only one parameter per request.&lt;&#x2F;p&gt;
+&lt;p&gt;As a quick workaround for the problem, you can use &lt;a href=&quot;https:&#x2F;&#x2F;tasmota.github.io&#x2F;docs&#x2F;Commands&#x2F;#the-power-of-backlog&quot;&gt;Backlog&lt;&#x2F;a&gt;, the built-in language...&lt;&#x2F;p&gt;
+&lt;p&gt;In short, you can just pass several commands in a row to this device, and then they will be executed sequentially. &lt;br &#x2F;&gt;
+And as a result, our command will look something like this:&lt;&#x2F;p&gt;
+&lt;pre style=&quot;background-color:#2b303b;color:#c0c5ce;&quot;&gt;&lt;code&gt;&lt;span&gt;Backlog ZbSend { “device”: “0x7E20”, “send”: { “Hue”: “128” }}; ZbSend { “device”: “0x7E20”, “send”: { “sat”: “254” }}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Good for quick hacks, but in practice it turns out that sending two commands is not the fastest process and instead you can sometimes find “undocumented” commands.&lt;&#x2F;p&gt;
+&lt;p&gt;In case of this lightbulb there is a command &lt;code&gt;Color&lt;&#x2F;code&gt; which allows to set &lt;code&gt;X&lt;&#x2F;code&gt; and &lt;code&gt;Y&lt;&#x2F;code&gt; values at the same time, but about this again a little later.&lt;&#x2F;p&gt;
+&lt;h1 id=&quot;home-assistant&quot;&gt;Home Assistant&lt;&#x2F;h1&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;home-assistant.png&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 4. Home Assistant&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+&lt;p&gt;Remember when I said that Tasmota doesn&#x27;t know how to do auto discovery? Well, here it is. &lt;br &#x2F;&gt;
+We&#x27;re gonna write the configs. &lt;br &#x2F;&gt;
+By hands. &lt;br &#x2F;&gt;
+And may Nix and its ability to write functions for autogenerating YAML help us.&lt;&#x2F;p&gt;
+&lt;h2 id=&quot;mqtt-topics&quot;&gt;MQTT Topics&lt;&#x2F;h2&gt;
+&lt;p&gt;Essentially we only need two topics: &lt;code&gt;tasmota&#x2F;tele&#x2F;tasmota_${gw_addr}&#x2F;SENSOR&lt;&#x2F;code&gt; to read telemetry and &lt;code&gt;tasmota&#x2F;cmnd&#x2F;tasmota_${gw_addr}&#x2F;ZbSend&lt;&#x2F;code&gt; to send commands. &lt;br &#x2F;&gt;
+Perhaps a third &lt;code&gt;tasmota&#x2F;cmnd&#x2F;tasmota_${gw_addr}&#x2F;Backlog&lt;&#x2F;code&gt; for executing Backlog commands.&lt;&#x2F;p&gt;
+&lt;p&gt;Yes, any of the commands from the &lt;a href=&quot;https:&#x2F;&#x2F;tasmota.github.io&#x2F;docs&#x2F;Commands&quot;&gt;list&lt;&#x2F;a&gt; can be called via MQTT by sending it to the appropriate topic, where the last part is the name of the command.&lt;&#x2F;p&gt;
+&lt;p&gt;We will send JSON&#x27;s and parse them too. So let&#x27;s get to practice.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;switches-and-sensors&quot;&gt;Switches and sensors&lt;&#x2F;h3&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;smart-socket.jpg&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 5. Switches with sensors&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+&lt;p&gt;Let&#x27;s remember out JSON from the socket&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;boiler_switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C13877C8106300&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS011F&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3000_cehuw1lw&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;P01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RMSVoltage&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;226&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ActivePower&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;73&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806125&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;98
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;In addition to &lt;code&gt;Power&lt;&#x2F;code&gt;, which controls turning the socket on and off, we also have &lt;code&gt;RMSVoltage&lt;&#x2F;code&gt; (measures the amount of volts) and &lt;code&gt;ActivePower&lt;&#x2F;code&gt; (measures the amount of ampers).&lt;&#x2F;p&gt;
+&lt;p&gt;So let&#x27;s go to writing the config:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mqtt &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;switch &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;    {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unique_id &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;boiler_outlet_switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Boiler Outlet Switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_6A65EC&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;0x9AD4&amp;#39;].Power }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;command_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_6A65EC&#x2F;ZbSend&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;payload_on &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;:&amp;quot;0x9AD4&amp;quot;,&amp;quot;send&amp;quot;:{&amp;quot;Power&amp;quot;: &amp;quot;ON&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;payload_off &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;:&amp;quot;0x9AD4&amp;quot;,&amp;quot;send&amp;quot;:{&amp;quot;Power&amp;quot;: &amp;quot;OFF&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;retain &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device_class &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;outlet&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Boiler Outlet&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;model &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS011F&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;manufacturer &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Tuya&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;identifiers &lt;&#x2F;span&gt;&lt;span&gt;= [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  ];
+&lt;&#x2F;span&gt;&lt;span&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;A full explanation of each parameter can be found in the corresponding &lt;a href=&quot;https:&#x2F;&#x2F;www.home-assistant.io&#x2F;integrations&#x2F;switch.mqtt&#x2F;&quot;&gt;documentation&lt;&#x2F;a&gt;, so I&#x27;ll run through the important stuff:&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;state_topic&lt;&#x2F;code&gt; and &lt;code&gt;command_topic&lt;&#x2F;code&gt; are those topics for reading the state and sending commands. Usually right after receiving a command a device will throw a message with the changed state, which allows you not to rely on the “optimistic” strategy of Home Assistant and, albeit with a slight delay, but to know the actual state of the hardware.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;value_template&lt;&#x2F;code&gt; - a template for pulling a parameter value from JSON. Since JSON&#x27;s are generated by the getway itself, you can copy the template from the example and only change the last part. Yes, I copied that from someone else too.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;code&gt;payload_on&lt;&#x2F;code&gt; and &lt;code&gt;payload_off&lt;&#x2F;code&gt; - everything is clear here too, but later we will learn how to template them.&lt;&#x2F;p&gt;
+&lt;p&gt;Of course, it will be unpleasant to write such a mess for each socket, so let&#x27;s wrap everything in a function:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ts011f_switch &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; id: name: short_addr: gw_addr:
+&lt;&#x2F;span&gt;&lt;span&gt;  {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unique_id &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;id&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt; Switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;font-style:italic;color:#2b303b;&quot;&gt;].&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;Power &lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;command_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;ZbSend&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;payload_on &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;,&amp;quot;send&amp;quot;:{&amp;quot;Power&amp;quot;: &amp;quot;ON&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;payload_off &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;:&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;,&amp;quot;send&amp;quot;:{&amp;quot;Power&amp;quot;: &amp;quot;OFF&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;retain &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device_class &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;outlet&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;model &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS011F&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;manufacturer &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Tuya&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;identifiers &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;short_addr &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;  }&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;Wait, we also have sensors. So, we are writing functions for them too:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ts011f_sensors &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; id: name: short_addr: gw_addr: 
+&lt;&#x2F;span&gt;&lt;span&gt;  [
+&lt;&#x2F;span&gt;&lt;span&gt;    {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unique_id &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;id&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt; Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;#39;].ActivePower }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unit_of_measurement &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;W&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;identifiers &lt;&#x2F;span&gt;&lt;span&gt;= [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;    {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unique_id &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;id&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_voltage&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt; Voltage&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;#39;].RMSVoltage }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unit_of_measurement &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;V&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;identifiers &lt;&#x2F;span&gt;&lt;span&gt;= [ &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; ];
+&lt;&#x2F;span&gt;&lt;span&gt;      };
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  ]&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;As a result, our config immediately starts to look nicer and we can add as many outlets as we have (and I have four of them):&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;mqtt &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; {
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;switch &lt;&#x2F;span&gt;&lt;span&gt;= [
+&lt;&#x2F;span&gt;&lt;span&gt;    (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ts011f_switch &lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;boiler_switch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Boiler&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;6A65EC&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span&gt;  ];
+&lt;&#x2F;span&gt;&lt;span&gt;  &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;sensor &lt;&#x2F;span&gt;&lt;span&gt;= (&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;ts011f_sensors &lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;boiler&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Boiler&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x9AD4&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;6A65EC&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;)
+&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h2 id=&quot;lightbulbs&quot;&gt;Lightbulbs&lt;&#x2F;h2&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;smart-bulb.jpg&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 6. Lightbulb&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+&lt;p&gt;Now for the hard part. Lightbulbs. &lt;br &#x2F;&gt;
+Lightbulbs are completely cursed devices. &lt;br &#x2F;&gt;
+They look simple enough, but that simplicity is deceptive and lures the unfortunate people to the cliffs of insanity.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;cliffs-of-insanity&quot;&gt;Cliffs of insanity&lt;&#x2F;h3&gt;
+&lt;p&gt;Let&#x27;s take another look at JSON&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;json&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-json &quot;&gt;&lt;code class=&quot;language-json&quot; data-lang=&quot;json&quot;&gt;&lt;span&gt;{
+&lt;&#x2F;span&gt;&lt;span&gt;  &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbInfo&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;    &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x7E20&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: {
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Device&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0x7E20&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Name&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;main_light_0&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;IEEEAddr&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;0xA4C138E23EE90340&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ModelId&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TS0505B&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Manufacturer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;_TZ3210_4sku4dkz&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Endpoints&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;242
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Config&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: [
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;O01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;~01.1&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;        &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;L01&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;
+&lt;&#x2F;span&gt;&lt;span&gt;      ],
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Power&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Dimmer&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;254&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Hue&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Sat&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;0&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;X&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;24218&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Y&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;15601&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;CT&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;499&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ColorMode&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGB&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FFFFFF&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGBb&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;FFFFFF&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Reachable&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;true&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeen&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;4&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LastSeenEpoch&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;1741806194&lt;&#x2F;span&gt;&lt;span&gt;,
+&lt;&#x2F;span&gt;&lt;span&gt;      &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;LinkQuality&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;: &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;91
+&lt;&#x2F;span&gt;&lt;span&gt;    }
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;span&gt;}
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This particular bulb can change power, temperature and color.&lt;&#x2F;p&gt;
+&lt;p&gt;In fact, it doesn&#x27;t do this simultaneously, but rather switches between modes, that we can see in &lt;code&gt;ColorMode&lt;&#x2F;code&gt; parameter. &lt;br &#x2F;&gt;
+However, we need this information only for research and debugging.&lt;&#x2F;p&gt;
+&lt;p&gt;The first mode is a bright glow at full power with variable temperature. The parameters &lt;code&gt;Dimmer&lt;&#x2F;code&gt; and &lt;code&gt;CT&lt;&#x2F;code&gt; (Color Temperature) are responsible for this, correspondingly.&lt;&#x2F;p&gt;
+&lt;p&gt;The second and third modes are RGB modes. They differ only in the way of color selection: Hue\Sat or X\Y.&lt;&#x2F;p&gt;
+&lt;p&gt;It is logical to assume that we want to change the parameters &lt;code&gt;Hue&lt;&#x2F;code&gt; and &lt;code&gt;Sat&lt;&#x2F;code&gt; or &lt;code&gt;X&lt;&#x2F;code&gt; and &lt;code&gt;Y&lt;&#x2F;code&gt;, but here comes a question that is not the most obvious from the first time.&lt;&#x2F;p&gt;
+&lt;p&gt;&lt;strong&gt;What exactly are the values that this parameters can take?&lt;&#x2F;strong&gt;&lt;&#x2F;p&gt;
+&lt;p&gt;On the one hand, we can rely on common sense. &lt;br &#x2F;&gt;
+Hue is a circle, so the range of values should be 0...360. &lt;br &#x2F;&gt;
+And the XY coordinate system uses range 0.0 to 1.0.&lt;&#x2F;p&gt;
+&lt;p&gt;But life is always more unpredictable than the theory. &lt;br &#x2F;&gt;
+And we are dealing with a lightbulb that is both a switch and a humidity sensor.&lt;&#x2F;p&gt;
+&lt;p&gt;So the only adequate way to know the real range of values is to poke them with a stick and see what happens.&lt;&#x2F;p&gt;
+&lt;p&gt;For example, &lt;code&gt;Dimmer&lt;&#x2F;code&gt; has a value range of 0...254. But when we try to set it to 255, the bulb returns null from the telemetry topic, which is very strange, because it is obviously an 8-bit variable.&lt;&#x2F;p&gt;
+&lt;p&gt;My attempts to find the values of &lt;code&gt;Hue&lt;&#x2F;code&gt; and &lt;code&gt;Sat&lt;&#x2F;code&gt; did not lead to anything constructive, but &lt;code&gt;X&lt;&#x2F;code&gt; and &lt;code&gt;Y&lt;&#x2F;code&gt; simply refused to accept the command when I tried to put into them a value not in the range of 0..65279. &lt;br &#x2F;&gt;
+Why not 0..65535, as someone suggested on the Internets, thinking that this is a 16-bit variable? &lt;br &#x2F;&gt;
+Well, that&#x27;s... Because! Just don&#x27;t ask.&lt;&#x2F;p&gt;
+&lt;h3 id=&quot;compiling-everything-into-home-assistant&quot;&gt;Compiling everything into Home Assistant&lt;&#x2F;h3&gt;
+&lt;p&gt;As a result, we have gathered all the knowledge, gained during the process of poking things with a stick, and now we are ready to write the function.&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;tz3210_lamp &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; id: name: short_addr: gw_addr:
+&lt;&#x2F;span&gt;&lt;span&gt;  {
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;unique_id &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;id&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;name&lt;&#x2F;span&gt;&lt;span&gt;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;command_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;ZbSend&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;payload_on &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;: {&amp;quot;Power&amp;quot;: &amp;quot;ON&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;payload_off &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;: {&amp;quot;Power&amp;quot;: &amp;quot;OFF&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;brightness_command_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;ZbSend&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;brightness_command_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;: { &amp;quot;Dimmer&amp;quot;: &amp;quot;{{ value - 1 }}&amp;quot; }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;brightness_state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;brightness_value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;#39;].Dimmer }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;xy_command_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;ZbSend&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;xy_command_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;Device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;:{ &amp;quot;Color&amp;quot;: &amp;quot;{{ x * 65279 }},{{ y * 65279 }}&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;xy_state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;xy_value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;#39;].X &#x2F; 65279 }},{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;#39;].Y &#x2F; 65279 }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;color_temp_command_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;ZbSend&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;color_temp_command_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{&amp;quot;device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;: { &amp;quot;CT&amp;quot;: &amp;quot;{{ value - 1 }}&amp;quot; }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;color_temp_state_topic &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;tele&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;SENSOR&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;color_temp_value_template &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;{{ value_json.ZbReceived[&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;#39;].CT }}&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;    &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;device &lt;&#x2F;span&gt;&lt;span&gt;= {
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;name &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;RGB Lamp&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;model &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;TZ3210&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;      &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;manufacturer &lt;&#x2F;span&gt;&lt;span&gt;= &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;Tuya&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;;
+&lt;&#x2F;span&gt;&lt;span&gt;        &lt;&#x2F;span&gt;&lt;span style=&quot;color:#d08770;&quot;&gt;identifiers &lt;&#x2F;span&gt;&lt;span&gt;= [ &lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;short_addr &lt;&#x2F;span&gt;&lt;span&gt;];
+&lt;&#x2F;span&gt;&lt;span&gt;    };
+&lt;&#x2F;span&gt;&lt;span&gt;  }
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;p&gt;This function is just a beautiful collection of hacks to make the things somehow work. &lt;br &#x2F;&gt;
+Let&#x27;s go in order&lt;&#x2F;p&gt;
+&lt;p&gt;According to Home Assistant, &lt;code&gt;Dimmer&lt;&#x2F;code&gt; should take values 0...255, but as we already know, the maximum value there is 254, so just subtract one. Anyway you can&#x27;t set a power in HA interface lower than 3%.
+Same thing for &lt;code&gt;CT&lt;&#x2F;code&gt;.&lt;&#x2F;p&gt;
+&lt;p&gt;According to the same default Home Assistant settings, &lt;code&gt;X&lt;&#x2F;code&gt; and &lt;code&gt;Y&lt;&#x2F;code&gt; take values from 0 to 1.0, so the conversion back and forth is done simply by multiplication\division by the maximum possible value.&lt;&#x2F;p&gt;
+&lt;p&gt;Besides, &lt;code&gt;Color&lt;&#x2F;code&gt; function is used here in &lt;code&gt;xy_command_template&lt;&#x2F;code&gt;, which allows to pass &lt;code&gt;X&lt;&#x2F;code&gt; and &lt;code&gt;Y&lt;&#x2F;code&gt; values in one command, which was accidentally found in the discussion about some other device I don&#x27;t remember where.&lt;&#x2F;p&gt;
+&lt;p&gt;If this function wasn&#x27;t there, the config would look something like this:&lt;&#x2F;p&gt;
+&lt;pre data-lang=&quot;nix&quot; style=&quot;background-color:#2b303b;color:#c0c5ce;&quot; class=&quot;language-nix &quot;&gt;&lt;code class=&quot;language-nix&quot; data-lang=&quot;nix&quot;&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;xy_command_topic &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;tasmota&#x2F;cmnd&#x2F;tasmota_&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;gw_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&#x2F;Backlog&lt;&#x2F;span&gt;&lt;span&gt;&amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;span style=&quot;color:#bf616a;&quot;&gt;xy_command_template &lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;=&lt;&#x2F;span&gt;&lt;span&gt; &amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;ZbSend {&amp;quot;Device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;:{ &amp;quot;X&amp;quot;: &amp;quot;{{ x * 65279 }}&amp;quot;}}; ZbSend {&amp;quot;Device&amp;quot;: &amp;quot;&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;${&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#bf616a;&quot;&gt;short_addr&lt;&#x2F;span&gt;&lt;span style=&quot;font-style:italic;color:#ab7967;&quot;&gt;}&lt;&#x2F;span&gt;&lt;span style=&quot;color:#a3be8c;&quot;&gt;&amp;quot;, &amp;quot;send&amp;quot;:{ &amp;quot;Y&amp;quot;: &amp;quot;{{ y * 65279 }}&amp;quot;}}&lt;&#x2F;span&gt;&lt;span&gt;&amp;#39;&amp;#39;&lt;&#x2F;span&gt;&lt;span style=&quot;background-color:#bf616a;color:#2b303b;&quot;&gt;;&lt;&#x2F;span&gt;&lt;span&gt;
+&lt;&#x2F;span&gt;&lt;&#x2F;code&gt;&lt;&#x2F;pre&gt;
+&lt;h1 id=&quot;this-is-the-end&quot;&gt;This is the end&lt;&#x2F;h1&gt;
+&lt;p&gt;And on that note, my adventures are finally over.&lt;&#x2F;p&gt;
+&lt;p&gt;The lights are lighting, the boiler is boiling and even the aquarium light has its own remote control.&lt;&#x2F;p&gt;
+&lt;p&gt;I really didn&#x27;t like the smart home, the process was just too stupid for production use.&lt;&#x2F;p&gt;
+&lt;p&gt;And the fucked up overpricings upset me even more. &lt;br &#x2F;&gt;
+I&#x27;d better go to AliExpress to buy other hardware, at least there they can clearly write the model and manufacturer.&lt;&#x2F;p&gt;
+
+  &lt;figure class=&quot;center&quot; &gt;
+    &lt;img src=&quot;&#x2F;blog&#x2F;tasmota-tuya-perversions&#x2F;bisexual-lighting.png&quot; decoding=&quot;async&quot; loading=&quot;lazy&quot;&#x2F;&gt;
+    
+      &lt;figcaption class=&quot;center&quot;&gt;&lt;p&gt;Fig. 7. Bisexual lighting&lt;&#x2F;p&gt;
+&lt;&#x2F;figcaption&gt;
+    
+  &lt;&#x2F;figure&gt;
+
+</content>
+        
+    </entry>
+</feed>
